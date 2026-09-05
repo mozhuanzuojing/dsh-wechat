@@ -1030,10 +1030,18 @@ export class WeChatDSHBridge {
     // Settings-page cwd is the DEFAULT workspace: apply it to users who never
     // explicitly switched workspaces (cwdExplicit unset). Explicit choices
     // made via /workspace or /session switch are preserved.
+    //
+    // Previously this only ran when the config value itself changed
+    // (`patch.cwd !== before.cwd`). A user created under an older default
+    // (state.cwd = old path) was therefore never re-synced when the default
+    // was later changed and then saved again — the save was a no-op for cwd
+    // and the user stayed stuck on the stale workspace. Re-sync whenever the
+    // save carries `cwd`, and only update users whose cwd actually differs,
+    // so the sync is idempotent and the "applied" message reflects real work.
     let appliedCwd = 0;
-    if (patch.cwd !== undefined && patch.cwd !== before.cwd) {
+    if (patch.cwd !== undefined) {
       for (const user of this.state.all()) {
-        if (user.cwdExplicit !== true) {
+        if (user.cwdExplicit !== true && user.cwd !== patch.cwd) {
           this.state.update(user.userId, { cwd: patch.cwd });
           appliedCwd++;
         }
